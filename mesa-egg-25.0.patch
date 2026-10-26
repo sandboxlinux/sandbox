@@ -57,7 +57,7 @@
        (vscreen->caps.caps.v2.host_feature_check_version < 1);
 --- a/src/gallium/drivers/virgl/virgl_context.c
 +++ b/src/gallium/drivers/virgl/virgl_context.c
-@@ -1404,11 +1404,24 @@
+@@ -1404,11 +1404,22 @@
                                    int fd,
                                    enum pipe_fd_type type)
  {
@@ -74,16 +74,14 @@
 +/* glSignalSemaphoreEXT: nothing to signal on virtio-gpu; the fence a consumer
 + * would wait on is the one the next submit produces. Flush so it does. */
 +static void virgl_fence_server_signal(struct pipe_context *ctx,
-+                                      struct pipe_fence_handle *fence,
-+                                      uint64_t value)
++                                      struct pipe_fence_handle *fence)
 +{
 +   (void)fence;
-+   (void)value;
 +   ctx->flush(ctx, NULL, 0);
  }
  
  static void virgl_fence_server_sync(struct pipe_context *ctx,
-@@ -1779,6 +1792,7 @@
+@@ -1779,6 +1790,7 @@
     vctx->base.blit =  virgl_blit;
     vctx->base.create_fence_fd = virgl_create_fence_fd;
     vctx->base.fence_server_sync = virgl_fence_server_sync;
