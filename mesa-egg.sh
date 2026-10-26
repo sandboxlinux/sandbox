@@ -38,7 +38,7 @@ done
 APT_UPDATE="apt-get -o Acquire::Check-Date=false update"
 $APT_UPDATE
 DEBIAN_FRONTEND=noninteractive apt-get build-dep -y mesa
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends meson ninja-build pkg-config
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends meson ninja-build pkg-config git ca-certificates
 
 rm -rf "$SRC"; mkdir -p "$SRC"; cd "$SRC"
 git init -q mesa && cd mesa
