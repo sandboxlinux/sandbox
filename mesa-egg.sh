@@ -1,24 +1,29 @@
 #!/bin/bash
-# Build the egg's patched Mesa for Firefox's WebGPU present-without-readback
-# swap chain and install it under /opt/mesa-egg. Runs inside `egg build` as
-# root with network. Only Firefox uses it (through /usr/local/bin/firefox);
-# the system Mesa that GNOME runs on is untouched.
+# Build the egg's Mesa from EggRun's fork and install it under /opt/mesa-egg.
+# Runs inside `egg build` as root with network. Only Firefox uses it (through
+# /usr/local/bin/firefox); the distribution's Mesa that GNOME runs on is
+# untouched. Every Linux egg builds the same commit (MESA_COMMIT below): one
+# version, one set of changes, one host-protocol check.
 #
-# What the patch (mesa-egg-<minor>.patch, applied to the distribution's mesa source) does:
+# The fork (github.com/CamouflageNetworks/mesa, branch `egg`, on upstream's
+# mesa-26.0.8) carries as commits what Firefox's WebGPU present-without-
+# readback swap chain needs on virtio-gpu and stock Mesa refuses:
 #  - Venus (the Vulkan driver on the host GPU) also claims OPAQUE_FD binary
 #    semaphores and exports them as the sync file it already has: Firefox's
-#    wgpu gates its dma_buf swap chain on OPAQUE_FD export.
+#    wgpu (and Chrome's Dawn) gate the dma_buf swap chain on OPAQUE_FD export.
 #  - virgl (the GL driver) exposes GL_EXT_semaphore(_fd) over its existing
 #    in-fence path, so Firefox's compositor waits for the WebGPU frame.
 #  - The GL semaphore entry points are allowed on a GLES 3.0 context (Mesa's
 #    API table tags them 3.2; virgl on this host is 3.0).
 # The host half is the runner's EGG_VENUS_SHARED_PRESENT (on by default).
 # Only the virgl GL driver and the virtio Vulkan driver are built, without
-# LLVM: about two minutes on four vCPUs. Build dependencies are removed again.
+# LLVM: about two minutes on four vCPUs. The distribution's own mesa
+# build-dependencies cover it; they are removed again afterwards.
 set -euo pipefail
+MESA_REPO=https://github.com/CamouflageNetworks/mesa.git
+MESA_COMMIT=f5b610d71918c2a346ab4fb9fc8ae48bb8bc779c
 SRC=/root/mesa-src
 PREFIX=/opt/mesa-egg
-HERE="$(cd "$(dirname "$0")" && pwd)"
 
 dpkg-query -W -f='${binary:Package}\n' | sort > /tmp/mesa-egg-pkgs-before
 # Source packages on: Ubuntu's and Debian's deb822 files (Types: deb) and any
@@ -36,17 +41,11 @@ DEBIAN_FRONTEND=noninteractive apt-get build-dep -y mesa
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends meson ninja-build pkg-config
 
 rm -rf "$SRC"; mkdir -p "$SRC"; cd "$SRC"
-apt-get source mesa
-cd "$SRC"/mesa-*/
-# One patch per Mesa minor the eggs ship: Ubuntu 26.04's 26.0, Debian 13's 25.0.
-MESA_MINOR=$(basename "$PWD" | sed 's/^mesa-//; s/^\([0-9]*\.[0-9]*\).*/\1/')
-PATCH="$HERE/mesa-egg-$MESA_MINOR.patch"
-[ -f "$PATCH" ] || { echo "mesa-egg: no patch for Mesa $MESA_MINOR (have: $(ls "$HERE"/mesa-egg-*.patch | xargs -n1 basename | tr '\n' ' '))"; exit 1; }
-patch -p1 < "$PATCH"
-XML=$(find src -name EXT_external_objects.xml | head -1)
-[ -n "$XML" ] || { echo "mesa-egg: EXT_external_objects.xml not found"; exit 1; }
-sed -i 's/es2="3.2"/es2="2.0"/' "$XML"
-grep -q 'es2="2.0"' "$XML"
+git init -q mesa && cd mesa
+git fetch -q --depth 1 "$MESA_REPO" "$MESA_COMMIT"
+git checkout -q FETCH_HEAD
+[ "$(git rev-parse HEAD)" = "$MESA_COMMIT" ] || { echo "mesa-egg: fetched $(git rev-parse HEAD), wanted $MESA_COMMIT"; exit 1; }
+echo "mesa-egg: building Mesa $(cat VERSION) from $MESA_REPO @ ${MESA_COMMIT:0:12}"
 
 meson setup build-egg --prefix="$PREFIX" --libdir=lib/aarch64-linux-gnu --buildtype=release \
   -Dgallium-drivers=virgl -Dvulkan-drivers=virtio -Dllvm=disabled -Dplatforms=x11,wayland \
