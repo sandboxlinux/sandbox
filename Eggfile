@@ -64,9 +64,35 @@ RUN install -d -m 0755 /etc/apt/keyrings \
  && firefox --version
 # Firefox 158 on Linux still keeps WebGPU behind dom.webgpu.enabled; the policy
 # file turns it on for every profile ("default" keeps it changeable in about:config).
+# dom.webgpu.allow-present-without-readback: the WebGPU canvas reaches the
+# compositor as a shared texture (a dma_buf the patched Mesa below can export)
+# instead of a per-frame readback Firefox polls on a 100 ms timer: a heavy page
+# went from 20 fps to the display's 120 on the Ubuntu desktop egg. Harmless
+# where the shared path is unavailable: Firefox falls back by itself.
 RUN install -d -m 0755 /etc/firefox/policies \
- && printf '{"policies":{"Preferences":{"dom.webgpu.enabled":{"Value":true,"Status":"default"}}}}\n' > /etc/firefox/policies/policies.json \
- && python3 -c 'import json; p=json.load(open("/etc/firefox/policies/policies.json"))["policies"]["Preferences"]["dom.webgpu.enabled"]; assert p["Value"] is True, p'
+ && printf '{"policies":{"Preferences":{"dom.webgpu.enabled":{"Value":true,"Status":"default"},"dom.webgpu.allow-present-without-readback":{"Value":true,"Status":"default"}}}}\n' > /etc/firefox/policies/policies.json \
+ && python3 -c 'import json; p=json.load(open("/etc/firefox/policies/policies.json"))["policies"]["Preferences"]; assert p["dom.webgpu.enabled"]["Value"] is True, p; assert p["dom.webgpu.allow-present-without-readback"]["Value"] is True, p'
+
+# ── Firefox on a patched Mesa: WebGPU presents without a readback ────────
+# Firefox's shared-texture swap chain wants OPAQUE_FD-exportable Vulkan
+# semaphores and GL_EXT_semaphore_fd; Debian's Mesa offers neither on
+# virtio-gpu, so its 25.0.7 source is rebuilt with a four-file patch
+# (mesa-egg.sh explains it; canonical copies in EggRun's egg-drivers/linux-gpu)
+# into /opt/mesa-egg, and only Firefox is pointed at it through
+# /usr/local/bin/firefox. GNOME and Chrome keep Debian's Mesa. The host side is
+# the runner's EGG_VENUS_SHARED_PRESENT (on by default since 0.6.41). Build
+# deps go on for the build and are purged again by the script.
+COPY mesa-egg-25.0.patch /usr/local/lib/egg/mesa-egg-25.0.patch
+COPY mesa-egg-26.0.patch /usr/local/lib/egg/mesa-egg-26.0.patch
+COPY mesa-egg.sh /usr/local/lib/egg/mesa-egg.sh
+RUN bash /usr/local/lib/egg/mesa-egg.sh
+COPY firefox-mesa-egg /usr/local/bin/firefox
+RUN chmod 0755 /usr/local/bin/firefox
+RUN test -f /opt/mesa-egg/lib/aarch64-linux-gnu/libvulkan_virtio.so
+RUN test -f /opt/mesa-egg/lib/aarch64-linux-gnu/dri/virtio_gpu_dri.so
+RUN sh -c 'test "$(command -v firefox)" = /usr/local/bin/firefox'
+RUN /usr/local/bin/firefox --version
+RUN sh -c '! dpkg -s meson >/dev/null 2>&1'
 
 # Firefox 158 crashes on quit whenever a WebGPU page is open: wgpu drops its
 # Vulkan instance, the loader dlcloses the Venus driver, and the CanvasRenderer

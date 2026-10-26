@@ -1,0 +1,11 @@
+#!/bin/sh
+# Firefox on the egg's patched Mesa (/opt/mesa-egg): WebGPU presents its
+# canvas as a shared texture instead of a readback. /usr/local/bin precedes
+# /usr/bin in the session PATH, so the dock, the run dialog and a terminal
+# all land here. Everything else keeps the system Mesa.
+M=/opt/mesa-egg/lib/aarch64-linux-gnu
+export LD_LIBRARY_PATH="$M${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LIBGL_DRIVERS_PATH="$M/dri"
+export VK_DRIVER_FILES=/opt/mesa-egg/share/vulkan/icd.d/virtio_icd.aarch64.json
+export __EGL_VENDOR_LIBRARY_FILENAMES=/opt/mesa-egg/share/glvnd/egl_vendor.d/50_mesa.json
+exec /usr/bin/firefox "$@"
