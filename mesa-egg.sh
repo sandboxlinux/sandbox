@@ -21,7 +21,7 @@
 # build-dependencies cover it; they are removed again afterwards.
 set -euo pipefail
 MESA_REPO=https://github.com/CamouflageNetworks/mesa.git
-MESA_COMMIT=f5b610d71918c2a346ab4fb9fc8ae48bb8bc779c
+MESA_COMMIT=bc7396a2ae2ff3d5b5d78e4c729bd07471cb160c
 SRC=/root/mesa-src
 PREFIX=/opt/mesa-egg
 
