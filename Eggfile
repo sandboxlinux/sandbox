@@ -34,6 +34,12 @@ INSTALL agent
 # Every package at Debian's current stable + security level before anything
 # is added on top: the hub scans each build against OSV, and an egg we make
 # ourselves ships with the fixes Debian has already published.
+# The base's apt sources carry trixie main only (the installer put security
+# fixes on the disk but apt-setup's security entries never landed), so the
+# security and updates suites go in first: without them libexpat1 sits at the
+# installer's 2.9.0-1~deb13u1 while trixie main offers libexpat1-dev 2.8.3,
+# and `apt-get build-dep mesa` below fails on that pair (2026-11-02).
+RUN test -f /etc/apt/sources.list.d/debian-security.list || printf 'deb http://security.debian.org/debian-security trixie-security main contrib non-free-firmware\ndeb http://deb.debian.org/debian trixie-updates main contrib non-free-firmware\n' > /etc/apt/sources.list.d/debian-security.list
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 # GNOME 48 without recommends: the shell, session, GDM, the core apps, Dash to
 # Dock for the Garuda-style floating dock, AppIndicator for tray icons, the
