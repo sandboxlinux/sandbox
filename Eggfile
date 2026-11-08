@@ -107,6 +107,17 @@ RUN sh -c '! dpkg -s meson >/dev/null 2>&1'
 # /etc/environment into the GNOME session, so every dock launch gets it.
 # Verified 2026-10-16: three quits with the switch clean, the control crashed.
 RUN echo 'VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1' >> /etc/environment
+
+# Venus presents synchronously with implicit fencing: Mesa's async present
+# reads a client's damage rectangles after they are freed (EggRun GTK.md,
+# 2026-11-07); runner 0.6.67+ retires the fence the compositor waits on only
+# when the GPU is done. Mesa reads every .conf in drirc.d.
+RUN install -d /usr/share/drirc.d && printf '%s\n' \
+    '<driconf><device driver="venus">' \
+    '<application name="Default">' \
+    '<option name="venus_implicit_fencing" value="true"/>' \
+    '</application></device></driconf>' > /usr/share/drirc.d/50-egg-venus.conf
+RUN grep -q 'venus_implicit_fencing" value="true"' /usr/share/drirc.d/50-egg-venus.conf
 # AI on the dock. Claude Desktop (Anthropic's Linux beta) and Claude Code come
 # from Anthropic's signed apt repositories, so apt keeps them current; the
 # ChatGPT app with Codex (OpenAI's Linux preview) is OpenAI's own arm64 .deb,
