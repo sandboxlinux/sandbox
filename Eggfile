@@ -22,7 +22,7 @@ LOGIN_USER sandbox
 LOGIN_PASSWORD sandbox
 LOGIN_AUTOLOGIN true
 LOGIN_HELPTEXT "Signed in as sandbox by itself. When the system asks for a password (installing an app, changing a setting), use the one below."
-GPU virgl vram=2G
+GPU virgl vram=2G x86=virtio-gpu
 DISPLAY 1280x800 scale=2
 NETWORK restricted
 
