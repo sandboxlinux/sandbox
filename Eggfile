@@ -9,7 +9,7 @@
 # recommends, Dash to Dock for the dock. Theme: stock Adwaita, dark, with the
 # yellow accent (libadwaita apps follow it natively; no GTK theme to maintain).
 # Icons: Papirus-Dark (GPL-3), trimmed to the two variants in use. Font: Inter.
-# Greeter: GDM, autologin. Browsers: Chrome, Google's own arm64 build from
+# Greeter: GDM, autologin. Browsers: Chrome, Google's own build from
 # dl.google.com (what people know), and Firefox from Mozilla's apt repository
 # (WebGPU on the GPU; Chrome's WebGPU cannot reach it from inside a VM).
 # Published as egg/sandbox; EggRun/docs/sandbox keeps the research notes and test history.
@@ -22,7 +22,7 @@ LOGIN_USER sandbox
 LOGIN_PASSWORD sandbox
 LOGIN_AUTOLOGIN true
 LOGIN_HELPTEXT "Signed in as sandbox by itself. When the system asks for a password (installing an app, changing a setting), use the one below."
-GPU virgl vram=2G x86=virtio-gpu
+GPU virgl vram=2G x86=virtio-gpu arm64=virtio-gpu
 DISPLAY 1280x800 scale=2
 NETWORK restricted
 
@@ -52,8 +52,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libgl1-mesa-dri mesa-vulkan-drivers network-manager xdg-user-dirs \
     fonts-inter fonts-noto-core fonts-noto-color-emoji papirus-icon-theme \
     dbus-user-session pipewire-audio python3-gi gir1.2-gtk-3.0 wget ca-certificates xz-utils
-# Chrome: Google's arm64 .deb; its postinst registers Google's apt repo and key.
-RUN wget -qO /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_arm64.deb \
+# Chrome: Google's own .deb for the machine's architecture; its postinst
+# registers Google's apt repo and key.
+RUN wget -qO /tmp/chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_$(dpkg --print-architecture).deb" \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/chrome.deb && rm /tmp/chrome.deb
 # Firefox, current, from Mozilla's own apt repository: WebGPU on the egg's GPU.
 # Chrome's WebGPU needs a Vulkan-to-GL handoff that no VM can give it; Firefox
@@ -94,8 +95,9 @@ COPY mesa-egg.sh /usr/local/lib/egg/mesa-egg.sh
 RUN bash /usr/local/lib/egg/mesa-egg.sh
 COPY firefox-mesa-egg /usr/local/bin/firefox
 RUN chmod 0755 /usr/local/bin/firefox
-RUN test -f /opt/mesa-egg/lib/aarch64-linux-gnu/libvulkan_virtio.so
-RUN test -f /opt/mesa-egg/lib/aarch64-linux-gnu/dri/virtio_gpu_dri.so
+# The patched Mesa exists where the platform has the 3D device (not on linux-x86_64).
+RUN sh -c '[ "$(uname -m)" != aarch64 ] || test -f /opt/mesa-egg/lib/aarch64-linux-gnu/libvulkan_virtio.so'
+RUN sh -c '[ "$(uname -m)" != aarch64 ] || test -f /opt/mesa-egg/lib/aarch64-linux-gnu/dri/virtio_gpu_dri.so'
 RUN sh -c 'test "$(command -v firefox)" = /usr/local/bin/firefox'
 RUN /usr/local/bin/firefox --version
 RUN sh -c '! dpkg -s meson >/dev/null 2>&1'
@@ -120,7 +122,7 @@ RUN install -d /usr/share/drirc.d && printf '%s\n' \
 RUN grep -q 'venus_implicit_fencing" value="true"' /usr/share/drirc.d/50-egg-venus.conf
 # AI on the dock. Claude Desktop (Anthropic's Linux beta) and Claude Code come
 # from Anthropic's signed apt repositories, so apt keeps them current; the
-# ChatGPT app with Codex (OpenAI's Linux preview) is OpenAI's own arm64 .deb,
+# ChatGPT app with Codex (OpenAI's Linux preview) is OpenAI's own .deb,
 # whose postinst registers OpenAI's repository; the Codex CLI is the npm
 # package on Node 22 from NodeSource. All four sign in on first launch.
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl gnupg \
@@ -132,7 +134,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cu
  && echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" > /etc/apt/sources.list.d/claude-code.list \
  && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends claude-desktop claude-code \
  && claude --version
-RUN wget -qO /tmp/chatgpt.deb https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb \
+RUN wget -qO /tmp/chatgpt.deb "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_$(dpkg --print-architecture).deb" \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/chatgpt.deb && rm /tmp/chatgpt.deb
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \

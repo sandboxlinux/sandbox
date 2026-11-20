@@ -20,6 +20,13 @@
 # LLVM: about two minutes on four vCPUs. The distribution's own mesa
 # build-dependencies cover it; they are removed again afterwards.
 set -euo pipefail
+# Venus and virgl need the 3D device. A linux-x86_64 host attaches the 2D one
+# (the Eggfile's `GPU virgl x86=virtio-gpu`), so there is nothing to build
+# there: Firefox keeps the distribution's Mesa.
+if [ "$(uname -m)" != aarch64 ]; then
+  echo "mesa-egg: skipped on $(uname -m): no 3D device on this platform"
+  exit 0
+fi
 MESA_REPO=https://github.com/CamouflageNetworks/mesa.git
 MESA_COMMIT=52eb69a76d4b36fc08ca3e6dd173641e6a7f8cca
 SRC=/root/mesa-src

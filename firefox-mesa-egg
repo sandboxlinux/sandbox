@@ -4,6 +4,15 @@
 # /usr/bin in the session PATH, so the dock, the run dialog and a terminal
 # all land here. Everything else keeps the system Mesa.
 M=/opt/mesa-egg/lib/aarch64-linux-gnu
+# No patched Mesa in this egg (a platform without the 3D device): plain Firefox.
+[ -d "$M" ] || exec /usr/bin/firefox "$@"
+# The egg is running on the 2D device (virtio-gpu without the virgl feature,
+# bit 0 of what the guest negotiated): the patched drivers have nothing to
+# drive there, so plain Firefox again.
+for d in /sys/bus/virtio/devices/*; do
+  [ "$(cat "$d/device" 2>/dev/null)" = 0x0010 ] || continue
+  case "$(cat "$d/features" 2>/dev/null)" in 0*) exec /usr/bin/firefox "$@" ;; esac
+done
 export LD_LIBRARY_PATH="$M${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export LIBGL_DRIVERS_PATH="$M/dri"
 export VK_DRIVER_FILES=/opt/mesa-egg/share/vulkan/icd.d/virtio_icd.aarch64.json
